@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced RL Gridworld Comparison</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        .legend {
+            display: flex;
+            flex-direction: row !important; /* Forces items into a row */
+            flex-wrap: wrap;                /* Allows wrapping on small screens */
+            justify-content: center;        /* Centers the items */
+            align-items: center;
+            gap: 20px;                      /* Spacing between legend items */
+            
+            width: fit-content;
+            margin: 20px auto;
+            padding: 12px 24px;
+            border-radius: 8px;
+            background: rgba(30, 41, 59, 0.5); /* Optional: subtle background */
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 0 !important;    /* Removes vertical spacing */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ Advanced RL Gridworld Comparison</h1>
+            <p class="subtitle">Compare Q-Learning (Optimistic) vs SARSA (Realist) in Real-Time</p>
+        </header>
+
+        <div class="hyperparameters-section">
+            <h2>Hyperparameters Control</h2>
+            <div class="params-grid">
+                <div class="param-item">
+                    <label for="grid-size">Grid Size:</label>
+                    <input type="range" id="grid-size" min="3" max="15" value="4">
+                    <span class="param-value" id="grid-size-value">4x4</span>
+                </div>
+
+                <div class="param-item">
+                    <label for="learning-rate">Learning Rate (α):</label>
+                    <input type="range" id="learning-rate" min="0.01" max="1" step="0.01" value="0.1">
+                    <span class="param-value" id="learning-rate-value">0.10</span>
+                </div>
+                <div class="param-item">
+                    <label for="discount-factor">Discount Factor (γ):</label>
+                    <input type="range" id="discount-factor" min="0" max="1" step="0.05" value="0.9">
+                    <span class="param-value" id="discount-factor-value">0.90</span>
+                </div>
+                <div class="param-item">
+                    <label for="exploration-decay">Exploration Decay:</label>
+                    <input type="range" id="exploration-decay" min="0.00001" max="0.005" step="0.00001" value="0.0005">
+                    <input type="number" id="exploration-decay-number" min="0.00001" max="0.005" step="0.00001" value="0.0005">
+                    <span class="param-value" id="exploration-decay-value">0.0005</span>
+                </div>
+
+                <div class="param-item">
+                    <label for="min-exploration">Min Exploration (ε):</label>
+                    <input type="range" id="min-exploration" min="0.001" max="0.1" step="0.001" value="0.01">
+                    <span class="param-value" id="min-exploration-value">0.010</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="hole-selector-section">
+            <h2>🕳️ Configure Holes</h2>
+            <p class="hole-info">Click cells to add/remove holes. Start (S) and Goal (G) cannot be holes.</p>
+            <div id="hole-grid-container"></div>
+            <div class="hole-actions">
+                <button id="clear-holes-btn" class="btn-secondary btn--sm">Clear All Holes</button>
+                <button id="reset-holes-btn" class="btn-secondary btn--sm">Reset to Default</button>
+                <span class="hole-count">Holes: <strong id="hole-count">0</strong></span>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <h2>Training Status</h2>
+                <div class="stat-row">
+                    <span class="stat-label">Episodes:</span>
+                    <span class="stat-value" id="episode-count">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Exploration Rate (ε):</span>
+                    <span class="stat-value" id="epsilon-display">1.000</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Training Time:</span>
+                    <span class="stat-value" id="training-time">0s</span>
+                </div>
+                <div class="control-section">
+                    <div class="input-group">
+                        <label>Training Mode:</label>
+                        <select id="training-mode" class="form-control">
+                            <option value="batch">Batch</option>
+                            <option value="max">To Max</option>
+                        </select>
+                        <label>Episodes/Step:</label>
+                        <input type="number" id="episodes-input" value="200" min="1" max="2000">
+                    </div>
+                    <div class="button-group">
+                        <button id="start-btn" class="btn-primary">▶ Start Training</button>
+                        <button id="reset-btn" class="btn-secondary">↻ Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Performance Metrics</h2>
+                <div class="stat-row">
+                    <span class="stat-label">Q-Learning Avg:</span>
+                    <span class="stat-value" id="q-avg">0.00</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">SARSA Avg:</span>
+                    <span class="stat-value" id="sarsa-avg">0.00</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Naive Avg:</span>
+                    <span class="stat-value" id="naive-avg">0.00</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Recent Success Rate:</span>
+                    <span class="stat-value" id="success-rate" style="font-size: 0.85em; word-break: break-word; line-height: 1.4;">0%</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Policy Visualization</h2>
+                <div class="policy-buttons-2x2">
+                    <button id="viz-q" class="btn-visualize active" data-policy="q">Q-Learning</button>
+                    <button id="viz-sarsa" class="btn-visualize" data-policy="sarsa">SARSA</button>
+                    <button id="viz-naive" class="btn-visualize" data-policy="naive">Naive</button>
+                </div>
+
+                <div style="text-align: center; margin-top: 16px;">
+                    <button id="run-policy-btn" class="btn-primary" disabled>▶ Run Policy</button>
+                </div>
+                <p style="margin: 12px 0 0 0; color: var(--color-text-secondary); font-size: 0.9em; text-align: center;">
+                    Viewing: <strong id="current-policy" style="color: var(--color-primary);">Q-Learning</strong>
+                </p>
+            </div>
+        </div>
+
+        <div class="grid-section">
+            <h3 class="grid-title">🎮 Gridworld Environment</h3>
+            <div id="grid-container"></div>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" 
+                        style="background: linear-gradient(135deg, #22c55e, #16a34a);">
+                    </div>
+                    <span>Start</span>
+                </div>
+
+                <div class="legend-item">
+                    <div class="legend-color" 
+                        style="background: linear-gradient(135deg, #06b6d4, #0891b2);">
+                    </div>
+                    <span>Goal</span>
+                </div>
+
+                <div class="legend-item">
+                    <div class="legend-color" 
+                        style="background: linear-gradient(135deg, #dc2626, #991b1b);">
+                    </div>
+                    <span>Holes</span>
+                </div>
+
+                <div class="legend-item">
+                    <div class="legend-arrow" style="color: var(--color-q-learning);">
+                        →
+                    </div>
+                    <span>Q-Learning</span>
+                </div>
+
+                <div class="legend-item">
+                    <div class="legend-arrow" style="color: var(--color-sarsa);">
+                        →
+                    </div>
+                    <span>SARSA</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-card">
+                <h3>AVERAGE REWARD</h3>
+                <canvas id="rewardChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>STEPS PER EPISODE</h3>
+                <canvas id="winRateChart"></canvas> 
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 24px;">
+            <h2>🚀 Convergence Analysis</h2>
+            <div class="stats-bar" style="justify-content: space-around;">
+                <div class="stat-item">
+                    <span class="stat-label">Q-Learning Solved At:</span>
+                    <span class="stat-value" id="q-conv" style="color: var(--color-primary);">--</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">SARSA Solved At:</span>
+                    <span class="stat-value" id="sarsa-conv" style="color: #f97316;">--</span>
+                </div>
+            </div>
+            <p style="text-align: left; font-size: 0.8rem; color: #94a3b8; margin-top: 10px;">
+                * "Solved" means consistently reaching the goal with high efficiency based on map size.
+            </p>
+        </div>
+
+        <div class="explanation-section">
+            <h3 style="border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 20px;">
+                 Algorithm Logic & Behavior
+            </h3>
+            
+            <div class="explanation-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+                
+                <div class="explanation-item" style="border-left: 4px solid var(--color-q-learning); background: rgba(59, 130, 246, 0.05);">
+                    <strong style="color: var(--color-q-learning); font-size: 1.1em; display: block; margin-bottom: 8px;">
+                        Q-Learning (The Optimist)
+                    </strong>
+                    <p style="font-size: 0.9em; margin-bottom: 8px;">
+                        <strong>The Math:</strong> It assumes the next move will be <em>optimal</em>, ignoring the fact that it is currently exploring randomly.
+                    </p>
+                    <p style="font-size: 0.9em; margin-bottom: 8px;">
+                        <strong>The Path:</strong> It finds the absolute <strong>Shortest Path</strong>. On a Cliff map, it hugs the edge of the holes because that is the fastest way.
+                    </p>
+                    <p style="font-size: 0.9em;">
+                        <strong>Chart Behavior:</strong> It often has a <em>lower</em> Average Reward during training (because it falls in while trying to be perfect), but the <em>lowest</em> Step count.
+                    </p>
+                </div>
+
+                <div class="explanation-item" style="border-left: 4px solid var(--color-sarsa); background: rgba(249, 115, 22, 0.05);">
+                    <strong style="color: var(--color-sarsa); font-size: 1.1em; display: block; margin-bottom: 8px;">
+                        SARSA (The Realist)
+                    </strong>
+                    <p style="font-size: 0.9em; margin-bottom: 8px;">
+                        <strong>The Math:</strong> It learns from the action it <em>actually took</em>. If a random exploration move makes it fall, it marks that spot as dangerous.
+                    </p>
+                    <p style="font-size: 0.9em; margin-bottom: 8px;">
+                        <strong>The Path:</strong> It finds the <strong>Safest Path</strong>. It learns to walk "the long way around" to avoid accidentally slipping into a hole.
+                    </p>
+                    <p style="font-size: 0.9em;">
+                        <strong>Chart Behavior:</strong> It usually has a <em>higher</em> Average Reward (stays alive longer), but a <em>higher</em> Step count (takes the long route).
+                    </p>
+                </div>
+
+                <div class="explanation-item" style="border-left: 4px solid var(--color-naive); background: rgba(239, 68, 68, 0.05);">
+                    <strong style="color: var(--color-naive); font-size: 1.1em; display: block; margin-bottom: 8px;">
+                        Naive (Random Baseline)
+                    </strong>
+                    <p style="font-size: 0.9em;">
+                        This agent has no memory. It picks a random direction at every step. It is included to show how difficult the maze is to solve by pure luck (it almost never wins on large grids).
+                    </p>
+                </div>
+            </div>
+
+            <div class="explanation-item" style="margin-top: 24px; border: 1px solid rgba(148, 163, 184, 0.2);">
+                <strong style="color: #e2e8f0; font-size: 1em;">The "Cliff" Paradox: Why graphs differ</strong>
+                
+                <p style="margin-top: 8px; font-size: 0.9em; color: #94a3b8; line-height: 1.5;">
+                    You will often see <strong>SARSA (Orange)</strong> winning on the "Reward" chart (Left), but <strong>Q-Learning (Blue)</strong> winning on the "Steps" chart (Right).
+                </p>
+                <div style="display: flex; gap: 20px; margin-top: 10px; font-size: 0.85em;">
+                    <div style="flex: 1;">
+                        <span style="color: var(--color-q-learning);">● Q-Learning:</span> High Risk, High Speed.
+                    </div>
+                    <div style="flex: 1;">
+                        <span style="color: var(--color-sarsa);">● SARSA:</span> Low Risk, Slower Speed.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
